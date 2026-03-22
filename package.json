@@ -1,6 +1,6 @@
 {
   "name": "public-official-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for Korean public official asset disclosure data (공직자 재산공개)",
   "type": "module",
   "main": "dist/index.js",

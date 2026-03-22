@@ -27,8 +27,10 @@
 
 ## 설치
 
+별도 설치 없이 `npx`로 바로 실행할 수 있습니다.
+
 ```bash
-npm install -g public-official-mcp-server
+npx -y public-official-mcp-server
 ```
 
 ## Claude Desktop 설정
@@ -47,6 +49,12 @@ npm install -g public-official-mcp-server
     }
   }
 }
+```
+
+## Claude Code 설정
+
+```bash
+claude mcp add public-official-mcp-server -- npx -y public-official-mcp-server
 ```
 
 ### 환경변수

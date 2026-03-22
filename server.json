@@ -3,7 +3,7 @@
   "name": "io.github.yujiseok/public-official-mcp-server",
   "title": "Public Official Asset Disclosure (공직자 재산공개)",
   "description": "Korean public official asset disclosure data (공직자 재산공개) - search and retrieve assets",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "repository": {
     "url": "https://github.com/yujiseok/public-official-mcp",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "npm",
       "identifier": "public-official-mcp-server",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "stdio"
       }

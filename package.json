@@ -33,6 +33,7 @@
   "engines": {
     "node": ">=18"
   },
+  "mcpName": "io.github.yujiseok/public-official-mcp-server",
   "homepage": "https://github.com/yujiseok/public-official-mcp#readme",
   "repository": {
     "type": "git",

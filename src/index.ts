@@ -17,7 +17,6 @@ registerTools(server, config);
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("public-official-mcp-server running on stdio");
 }
 
 main().catch((error) => {

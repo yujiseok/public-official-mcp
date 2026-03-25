@@ -145,6 +145,149 @@ export async function searchPerson(
   return results;
 }
 
+export interface AssetKeywordResult {
+  keyword: string;
+  name: string;
+  organization: string;
+  position: string;
+  documentId: number;
+  documentTitle: string;
+  page: number;
+  highlight: string;
+}
+
+/**
+ * 키워드(종목명 등)로 관보 전문 검색 → 해당 페이지의 인물 정보 역추출
+ */
+export async function searchByKeyword(
+  keyword: string,
+  year: string | undefined,
+  timeout: number
+): Promise<AssetKeywordResult[]> {
+  const yearQuery = year ?? new Date().getFullYear().toString();
+  const cacheKey = `keyword:${keyword}:${yearQuery}`;
+  const cached = cache.get<AssetKeywordResult[]>(cacheKey);
+  if (cached) return cached;
+
+  // 1) 연도에 해당하는 관보 문서 검색
+  const docsResponse = await axios.get(`${DC_API_BASE}/search/`, {
+    params: {
+      q: `organization:${NEWSTAPA_ORG_ID} ${yearQuery}`,
+      per_page: 25,
+    },
+    timeout,
+  });
+
+  const docs: DocumentSearchResult[] = (docsResponse.data.results ?? []).map(
+    (doc: Record<string, unknown>) => ({
+      id: doc.id as number,
+      slug: doc.slug as string,
+      title: doc.title as string,
+      pageCount: doc.page_count as number,
+      createdAt: doc.created_at as string,
+    })
+  );
+
+  const yearDocs = docs.filter((d) => d.title.includes(yearQuery));
+  if (yearDocs.length === 0) return [];
+
+  // 2) 각 문서에서 키워드 검색 (병렬)
+  const results: AssetKeywordResult[] = [];
+  const searchPromises = yearDocs.map(async (doc) => {
+    try {
+      const response = await axios.get(
+        `${DC_API_BASE}/${doc.id}/search/`,
+        { params: { q: keyword }, timeout }
+      );
+      const pages = response.data ?? {};
+      const pageKeys = Object.keys(pages).filter((k) =>
+        k.startsWith("page_no_")
+      );
+      if (pageKeys.length === 0) return;
+
+      // 3) 각 페이지에서 인물 정보 추출
+      for (const pageKey of pageKeys) {
+        const pageNum = parseInt(pageKey.replace("page_no_", ""), 10);
+        const highlights: string[] = pages[pageKey] ?? [];
+        const highlightText = highlights
+          .filter((h: string) => h.toLowerCase().includes(keyword.toLowerCase()))
+          .join(" | ")
+          .slice(0, 200);
+
+        try {
+          const pageText = await getPageText(doc.id, doc.slug, pageNum, timeout);
+
+          // 해당 페이지에서 "소속 X 직위 Y 성명 Z" 헤더 찾기
+          const headerMatches = [
+            ...pageText.matchAll(
+              /소속\s+(.+?)\s+직위\s+(.+?)\s+성명\s+(.+)/g
+            ),
+          ];
+
+          if (headerMatches.length > 0) {
+            for (const m of headerMatches) {
+              results.push({
+                keyword,
+                name: m[3].trim(),
+                organization: m[1].trim(),
+                position: m[2].trim(),
+                documentId: doc.id,
+                documentTitle: doc.title,
+                page: pageNum,
+                highlight: highlightText || highlights[0]?.slice(0, 200) || "",
+              });
+            }
+          } else {
+            // 이전 페이지에서 헤더 찾기
+            if (pageNum > 1) {
+              const prevText = await getPageText(
+                doc.id, doc.slug, pageNum - 1, timeout
+              );
+              const prevHeaders = [
+                ...prevText.matchAll(
+                  /소속\s+(.+?)\s+직위\s+(.+?)\s+성명\s+(.+)/g
+                ),
+              ];
+              const lastHeader = prevHeaders[prevHeaders.length - 1];
+              if (lastHeader) {
+                results.push({
+                  keyword,
+                  name: lastHeader[3].trim(),
+                  organization: lastHeader[1].trim(),
+                  position: lastHeader[2].trim(),
+                  documentId: doc.id,
+                  documentTitle: doc.title,
+                  page: pageNum,
+                  highlight:
+                    highlightText || highlights[0]?.slice(0, 200) || "",
+                });
+              }
+            }
+          }
+        } catch {
+          // 페이지 텍스트 추출 실패 무시
+        }
+      }
+    } catch {
+      // 개별 문서 검색 실패 무시
+    }
+  });
+
+  await Promise.all(searchPromises);
+
+  // 중복 제거 (같은 이름+소속)
+  const seen = new Set<string>();
+  const unique = results.filter((r) => {
+    const key = `${r.name}:${r.organization}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  cache.set(cacheKey, unique);
+  return unique;
+}
+
 /**
  * DocumentCloud 문서의 특정 페이지 텍스트 추출 (캐시 포함)
  */

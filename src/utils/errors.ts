@@ -7,7 +7,7 @@ export function handleApiError(error: unknown): string {
       switch (status) {
         case 401:
         case 403:
-          return "Error: 인증 실패. DATA_GO_KR_SERVICE_KEY가 올바른지 확인해 주세요.";
+          return `Error: 인증 실패 (HTTP ${status}). DocumentCloud API 접근이 거부되었습니다.`;
         case 404:
           return "Error: 요청한 리소스를 찾을 수 없습니다.";
         case 429:
